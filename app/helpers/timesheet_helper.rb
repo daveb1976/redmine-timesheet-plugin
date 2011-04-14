@@ -21,7 +21,20 @@ module TimesheetHelper
             :method => 'post',
             :class => 'icon icon-timesheet')
   end
-  
+
+  def link_to_xls_export(timesheet)
+    link_to('XLS',
+            {
+                :controller => 'timesheet',
+                :action => 'report',
+                :format => 'xls',
+                :timesheet => timesheet.to_param
+            },
+            :method => 'post'
+    )
+  end
+
+
   def toggle_issue_arrows(issue_id)
     js = "toggleTimeEntries('#{issue_id}'); return false;"
     

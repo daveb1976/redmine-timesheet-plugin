@@ -1,6 +1,9 @@
 class TimesheetController < ApplicationController
   unloadable
 
+#  include Redmine::Export::XLS
+  include CustomFieldsHelper
+
   layout 'base'
   before_filter :get_list_size
   before_filter :get_precision
@@ -85,9 +88,10 @@ class TimesheetController < ApplicationController
     respond_to do |format|
       format.html { render :action => 'details', :layout => false if request.xhr? }
       format.csv  { send_data @timesheet.to_csv, :filename => 'timesheet.csv', :type => "text/csv" }
+      format.xls { send_data @timesheet.to_xls, :type => 'xls', :filename => "timesheet_issues.xls" }
     end
   end
-  
+
   def context_menu
     @time_entries = TimeEntry.find(:all, :conditions => ['id IN (?)', params[:ids]])
     render :layout => false
