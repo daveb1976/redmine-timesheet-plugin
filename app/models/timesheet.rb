@@ -15,14 +15,14 @@ class Timesheet
   # Sort time entries by this field
   attr_accessor :sort
   ValidSortOptions = {
-      :project => 'Project',
-      :user => 'User',
-      :issue => 'Issue'
+    :project => 'Project',
+    :user => 'User',
+    :issue => 'Issue'
   }
 
   ValidPeriodType = {
-      :free_period => 0,
-      :default => 1
+    :free_period => 0,
+    :default => 1
   }
 
   def initialize(options = {})
@@ -64,14 +64,14 @@ class Timesheet
   def fetch_time_entries
     self.time_entries = {}
     case self.sort
-      when :project
-        fetch_time_entries_by_project
-      when :user
-        fetch_time_entries_by_user
-      when :issue
-        fetch_time_entries_by_issue
-      else
-        fetch_time_entries_by_project
+    when :project
+      fetch_time_entries_by_project
+    when :user
+      fetch_time_entries_by_user
+    when :issue
+      fetch_time_entries_by_issue
+    else
+      fetch_time_entries_by_project
     end
   end
 
@@ -79,45 +79,45 @@ class Timesheet
     return if self.period_type == Timesheet::ValidPeriodType[:free_period]
     # Stolen from the TimelogController
     case period.to_s
-      when 'today'
-        self.date_from = self.date_to = Date.today
-      when 'yesterday'
-        self.date_from = self.date_to = Date.today - 1
-      when 'current_week' # Mon -> Sun
-        self.date_from = Date.today - (Date.today.cwday - 1)%7
-        self.date_to = self.date_from + 6
-      when 'last_week'
-        self.date_from = Date.today - 7 - (Date.today.cwday - 1)%7
-        self.date_to = self.date_from + 6
-      when '7_days'
-        self.date_from = Date.today - 7
-        self.date_to = Date.today
-      when 'current_month'
-        self.date_from = Date.civil(Date.today.year, Date.today.month, 1)
-        self.date_to = (self.date_from >> 1) - 1
-      when 'last_month'
-        self.date_from = Date.civil(Date.today.year, Date.today.month, 1) << 1
-        self.date_to = (self.date_from >> 1) - 1
-      when '30_days'
-        self.date_from = Date.today - 30
-        self.date_to = Date.today
-      when 'current_year'
-        self.date_from = Date.civil(Date.today.year, 1, 1)
-        self.date_to = Date.civil(Date.today.year, 12, 31)
-      when 'all'
-        self.date_from = self.date_to = nil
+    when 'today'
+      self.date_from = self.date_to = Date.today
+    when 'yesterday'
+      self.date_from = self.date_to = Date.today - 1
+    when 'current_week' # Mon -> Sun
+      self.date_from = Date.today - (Date.today.cwday - 1)%7
+      self.date_to = self.date_from + 6
+    when 'last_week'
+      self.date_from = Date.today - 7 - (Date.today.cwday - 1)%7
+      self.date_to = self.date_from + 6
+    when '7_days'
+      self.date_from = Date.today - 7
+      self.date_to = Date.today
+    when 'current_month'
+      self.date_from = Date.civil(Date.today.year, Date.today.month, 1)
+      self.date_to = (self.date_from >> 1) - 1
+    when 'last_month'
+      self.date_from = Date.civil(Date.today.year, Date.today.month, 1) << 1
+      self.date_to = (self.date_from >> 1) - 1
+    when '30_days'
+      self.date_from = Date.today - 30
+      self.date_to = Date.today
+    when 'current_year'
+      self.date_from = Date.civil(Date.today.year, 1, 1)
+      self.date_to = Date.civil(Date.today.year, 12, 31)
+    when 'all'
+      self.date_from = self.date_to = nil
     end
     self
   end
 
   def to_param
     {
-        :projects => projects.collect(&:id),
-        :date_from => date_from,
-        :date_to => date_to,
-        :activities => activities,
-        :users => users,
-        :sort => sort
+      :projects => projects.collect(&:id),
+      :date_from => date_from,
+      :date_to => date_to,
+      :activities => activities,
+      :users => users,
+      :sort => sort
     }
   end
 
@@ -128,46 +128,58 @@ class Timesheet
 
         # Write the CSV based on the group/sort
         case sort
-          when :user, :project
-            time_entries.sort.each do |entryname, entry|
-              entry[:logs].each do |e|
+        when :user, :project
+          time_entries.sort.each do |entryname, entry|
+            entry[:logs].each do |e|
+              csv << time_entry_to_csv(e)
+            end
+          end
+        when :issue
+          time_entries.sort.each do |project, entries|
+            entries[:issues].sort { |a, b| a[0].id <=> b[0].id }.each do |issue, time_entries|
+              time_entries.each do |e|
                 csv << time_entry_to_csv(e)
               end
             end
-          when :issue
-            time_entries.sort.each do |project, entries|
-              entries[:issues].sort { |a, b| a[0].id <=> b[0].id }.each do |issue, time_entries|
-                time_entries.each do |e|
-                  csv << time_entry_to_csv(e)
-                end
-              end
-            end
+          end
         end
       end
     end
   end
 
   def to_xls
-    csv_rows = to_csv.split("\n") # use the existing data for the summary page
+    # Summary page
+
+    
+
     Spreadsheet.client_encoding = 'UTF-8'
     book = Spreadsheet::Workbook.new
     summary_sheet = book.create_worksheet(:name => "Timesheet entries")
-    summary_sheet.row(0).replace csv_rows[0].split(",") # the headers
+
+    summary_sheet.row(0).replace %w(Date Member	Activity	Project	Issue	Subject	Comment	Hours) # the headers
     summary_sheet.column(8).default_format = Spreadsheet::Format.new :align => :right
-    total = 0
-    csv_rows[1..-1].compact.each_with_index do |row, i|
-      fields = row.split(",")
-      summary_sheet.row(i+1).replace fields
-      total += fields.last.to_f rescue 0.0
+    sorted_entries.each_with_index do |time_entry, i|
+      summary_sheet.row(i+1).replace [
+        time_entry.spent_on,
+        time_entry.user.name,
+        time_entry.activity.name,
+        time_entry.project.name,
+        ("#{time_entry.issue.tracker.name} ##{time_entry.issue.id}" if time_entry.issue),
+        (time_entry.issue.subject if time_entry.issue),
+        time_entry.comments,
+        time_entry.hours
+      ]
     end
+    total = sorted_entries.collect(&:hours).collect(&:to_f).sum
+
     summary_sheet[summary_sheet.rows.size, 0] = "Total"
-    summary_sheet[summary_sheet.rows.size-1, 8] = total
+    summary_sheet[summary_sheet.rows.size-1, 7] = total
 
     # Now write each issue detail to a new sheet
-    sorted_entries.collect(&:issue).uniq.each_with_index do |issue, i|
+    sorted_entries.collect(&:issue).compact.uniq.each_with_index do |issue, i|
       r = 0
       column = 0
-#      debugger if i == 1
+      #      debugger if i == 1
       sheet_name = "#{issue.tracker.name} ##{issue.id}"
       sheet = book.create_worksheet(:name => sheet_name)
       sheet.row(0).default_format = Spreadsheet::Format.new :weight => :bold, :size => 14
@@ -176,7 +188,7 @@ class Timesheet
       sheet.column(1).default_format = Spreadsheet::Format.new :text_wrap => true
       
       sheet.row(r).replace ["#{issue.tracker.name} ##{issue.id}:", issue.subject]
-      sheet.row(r+=1).replace ["", "(#{issue.parent.subject})"]
+      sheet.row(r+=1).replace ["", "(#{issue.parent.subject})"] if issue.parent
       sheet.row(r).default_format = Spreadsheet::Format.new :weight => :bold
       sheet.row(r+=1).replace ["", issue.description]
       sheet.row(r+=1).replace ["Created on", issue.created_on]
@@ -214,35 +226,35 @@ class Timesheet
   def sorted_entries
     entries = []
     case sort
-      when :user, :project
-        time_entries.sort.each do |entryname, entry|
-          entry[:logs].each do |e|
+    when :user, :project
+      time_entries.sort.each do |entryname, entry|
+        entry[:logs].each do |e|
+          entries << e
+        end
+      end
+    when :issue
+      time_entries.sort.each do |project, entries|
+        entries[:issues].sort { |a, b| a[0].id <=> b[0].id }.each do |issue, time_entries|
+          time_entries.each do |e|
             entries << e
           end
         end
-      when :issue
-        time_entries.sort.each do |project, entries|
-          entries[:issues].sort { |a, b| a[0].id <=> b[0].id }.each do |issue, time_entries|
-            time_entries.each do |e|
-              entries << e
-            end
-          end
-        end
+      end
     end
     entries
   end
 
   def csv_header
     csv_data = [
-        '#',
-        l(:label_date),
-        l(:label_member),
-        l(:label_activity),
-        l(:label_project),
-        l(:label_issue),
-        "#{l(:label_issue)} #{l(:field_subject)}",
-        l(:field_comments),
-        l(:field_hours)
+      '#',
+      l(:label_date),
+      l(:label_member),
+      l(:label_activity),
+      l(:label_project),
+      l(:label_issue),
+      "#{l(:label_issue)} #{l(:field_subject)}",
+      l(:field_comments),
+      l(:field_hours)
     ]
     Redmine::Hook.call_hook(:plugin_timesheet_model_timesheet_csv_header, {:timesheet => self, :csv_data => csv_data})
     return csv_data
@@ -250,15 +262,15 @@ class Timesheet
 
   def time_entry_to_csv(time_entry)
     csv_data = [
-        time_entry.id,
-        time_entry.spent_on,
-        time_entry.user.name,
-        time_entry.activity.name,
-        time_entry.project.name,
-        ("#{time_entry.issue.tracker.name} ##{time_entry.issue.id}" if time_entry.issue),
-        (time_entry.issue.subject if time_entry.issue),
-        time_entry.comments,
-        time_entry.hours
+      time_entry.id,
+      time_entry.spent_on,
+      time_entry.user.name,
+      time_entry.activity.name,
+      time_entry.project.name,
+      ("#{time_entry.issue.tracker.name} ##{time_entry.issue.id}" if time_entry.issue),
+      (time_entry.issue.subject if time_entry.issue),
+      time_entry.comments,
+      time_entry.hours
     ]
     Redmine::Hook.call_hook(:plugin_timesheet_model_timesheet_time_entry_to_csv, {:timesheet => self, :time_entry => time_entry, :csv_data => csv_data})
     return csv_data
@@ -270,27 +282,27 @@ class Timesheet
     if self.potential_time_entry_ids.empty?
       if self.date_from.present? && self.date_to.present?
         conditions = ["spent_on >= (:from) AND spent_on <= (:to) AND #{TimeEntry.table_name}.project_id IN (:projects) AND user_id IN (:users) AND (activity_id IN (:activities) OR (#{::Enumeration.table_name}.parent_id IN (:activities) AND #{::Enumeration.table_name}.project_id IN (:projects)))",
-                      {
-                          :from => self.date_from,
-                          :to => self.date_to,
-                          :projects => self.projects,
-                          :activities => self.activities,
-                          :users => users
-                      }]
+          {
+            :from => self.date_from,
+            :to => self.date_to,
+            :projects => self.projects,
+            :activities => self.activities,
+            :users => users
+          }]
       else # All time
         conditions = ["#{TimeEntry.table_name}.project_id IN (:projects) AND user_id IN (:users) AND (activity_id IN (:activities) OR (#{::Enumeration.table_name}.parent_id IN (:activities) AND #{::Enumeration.table_name}.project_id IN (:projects)))",
-                      {
-                          :projects => self.projects,
-                          :activities => self.activities,
-                          :users => users
-                      }]
+          {
+            :projects => self.projects,
+            :activities => self.activities,
+            :users => users
+          }]
       end
     else
       conditions = ["user_id IN (:users) AND #{TimeEntry.table_name}.id IN (:potential_time_entries)",
-                    {
-                        :users => users,
-                        :potential_time_entries => self.potential_time_entry_ids
-                    }]
+        {
+          :users => users,
+          :potential_time_entries => self.potential_time_entry_ids
+        }]
     end
 
     if extra_conditions
@@ -312,42 +324,42 @@ class Timesheet
 
   def time_entries_for_all_users(project)
     return project.time_entries.find(:all,
-                                     :conditions => self.conditions(self.users),
-                                     :include => self.includes,
-                                     :order => "spent_on ASC")
+      :conditions => self.conditions(self.users),
+      :include => self.includes,
+      :order => "spent_on ASC")
   end
 
   def time_entries_for_current_user(project)
     return project.time_entries.find(:all,
-                                     :conditions => self.conditions(User.current.id),
-                                     :include => self.includes,
-                                     :include => [:activity, :user, {:issue => [:tracker, :assigned_to, :priority]}],
-                                     :order => "spent_on ASC")
+      :conditions => self.conditions(User.current.id),
+      :include => self.includes,
+      :include => [:activity, :user, {:issue => [:tracker, :assigned_to, :priority]}],
+      :order => "spent_on ASC")
   end
 
   def issue_time_entries_for_all_users(issue)
     return issue.time_entries.find(:all,
-                                   :conditions => self.conditions(self.users),
-                                   :include => self.includes,
-                                   :include => [:activity, :user],
-                                   :order => "spent_on ASC")
+      :conditions => self.conditions(self.users),
+      :include => self.includes,
+      :include => [:activity, :user],
+      :order => "spent_on ASC")
   end
 
   def issue_time_entries_for_current_user(issue)
     return issue.time_entries.find(:all,
-                                   :conditions => self.conditions(User.current.id),
-                                   :include => self.includes,
-                                   :include => [:activity, :user],
-                                   :order => "spent_on ASC")
+      :conditions => self.conditions(User.current.id),
+      :include => self.includes,
+      :include => [:activity, :user],
+      :order => "spent_on ASC")
   end
 
   def time_entries_for_user(user, options={})
     extra_conditions = options.delete(:conditions)
 
     return TimeEntry.find(:all,
-                          :conditions => self.conditions([user], extra_conditions),
-                          :include => self.includes,
-                          :order => "spent_on ASC"
+      :conditions => self.conditions([user], extra_conditions),
+      :include => self.includes,
+      :order => "spent_on ASC"
     )
   end
 
