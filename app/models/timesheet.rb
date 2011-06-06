@@ -224,24 +224,24 @@ class Timesheet
   protected
 
   def sorted_entries
-    entries = []
+    entries_array = []
     case sort
     when :user, :project
       time_entries.sort.each do |entryname, entry|
         entry[:logs].each do |e|
-          entries << e
+          entries_array << e
         end
       end
     when :issue
       time_entries.sort.each do |project, entries|
         entries[:issues].sort { |a, b| a[0].id <=> b[0].id }.each do |issue, time_entries|
           time_entries.each do |e|
-            entries << e
+            entries_array << e
           end
         end
       end
     end
-    entries
+    entries_array
   end
 
   def csv_header
